@@ -14,7 +14,7 @@ Summarily, Unikraft components are shown in the image below:
 
 ![arch selection menu](/docs/sessions/01-baby-steps/images/unikraft_components.png)
 
-Unikraft is the core component, consisting of core / internal libraries, the build system, and platform and architecture code.
+Unikraft is the core component, consisting of core / internal libraries (each providing a part of the functionality commonly found in an operating system), the build system, and platform and architecture code.
 It is the basis of any unikernel image.
 It is located in the [main Unikraft repository](https://github.com/unikraft/unikraft).
 
@@ -50,20 +50,18 @@ First of all, make sure you have all the dependencies installed:
 ```
 $ sudo apt-get install -y --no-install-recommends build-essential \
         libncurses-dev libyaml-dev flex git wget socat bison \
-        unzip uuid-runtime
+        unzip uuid-runtime python3-pip
 ```
 
-We begin by cloning the kraft repository on our machine:
+You'll also need QEMU for launching virtual/emulated machines which will run unikernels targeting the KVM platform:
 ```
-git clone https://github.com/unikraft/kraft.git
+$ sudo apt-get -y install qemu-kvm qemu-system-x86
 ```
 
-Now, all we have to do is enter this directory and run the setup installer:
+To install the latest version of kraft, simply run:
 ```
-$ cd kraft
-$ pip install --user -e .
+$ pip3 install git+https://github.com/unikraft/kraft.git@staging
 ```
-This will install kraft for the local user.
 
 After installing or updating kraft, the first step is to download / update the software components available for building unikernel images.
 For this, run:
@@ -85,23 +83,25 @@ $ UK_KRAFT_GITHUB_TOKEN=<your_GitHub_token_here> kraft list update
 After this is done, you can get a list of all components that are available for use with kraft:
 ```
 $ kraft list
-UNIKRAFT        	VERSION 	RELEASED    	LAST CHECKED
-unikraft        	0.5     	17 hours ago	18 Aug 21
+UNIKRAFT                VERSION         RELEASED        LAST CHECKED
+unikraft                0.10.0          20 hours ago    14 hours ago
 
-PLATFORMS       	VERSION 	RELEASED    	LAST CHECKED
-solo5           	0.5     	13 Jul 21   	18 Aug 21
+PLATFORMS               VERSION         RELEASED        LAST CHECKED
+solo5                   0.10.0          5 days ago      14 hours ago
 [...]
 
-LIBRARIES       	VERSION 	RELEASED    	LAST CHECKED
-newlib          	0.5     	5 days ago  	18 Aug 21
-pthreadpool     	0.5     	7 days ago  	18 Aug 21
-lwip            	0.5     	6 days ago  	18 Aug 21
+LIBRARIES               VERSION         RELEASED        LAST CHECKED
+newlib                  0.10.0          2 days ago      26 Aug 22
+pthread-embedded        0.10.0          5 days ago      26 Aug 22
+lwip                    0.10.0          3 days ago      26 Aug 22
+http-parser             0.10.0          5 days ago      26 Aug 22
 [...]
 
-APPLICATIONS    	VERSION 	RELEASED    	LAST CHECKED
-python3         	0.4     	29 Mar 21   	18 Aug 21
-helloworld      	0.5     	29 Mar 21   	18 Aug 21
-httpreply       	0.5     	13 Jul 21   	18 Aug 21
+APPLICATIONS            VERSION         RELEASED        LAST CHECKED
+helloworld              0.10.0          5 days ago      26 Aug 22
+httpreply               0.10.0          5 days ago      26 Aug 22
+python3                 0.10.0          5 days ago      26 Aug 22
+redis                   0.10.0          5 days ago      26 Aug 22
 [...]
 ```
 
@@ -138,12 +138,12 @@ The `kraft up` command makes it easy to do that with one swoop.
 Let's do that for the `helloworld` application (listed with `kraft list`):
 ```
 $ kraft up -t helloworld hello
- 100.00% :::::::::::::::::::::::::::::::::::::::: |       21 /       21 |:  app/helloworld@0.5
-[INFO    ] Initialized new unikraft application: /home/razvan/hello
-make: Entering directory '/home/razvan/.unikraft/unikraft'
+ 100.00% :::::::::::::::::::::::::::::::::::::::: |       21 /       21 |:  app/helloworld@0.10.0
+[INFO    ] Initialized new unikraft application: /home/X/hello
+make: Entering directory '/home/X/.unikraft/unikraft'
 [...]
 #
-# configuration written to /home/razvan/hello/.config
+# configuration written to /home/X/hello/.config
 #
 [...]
 CC      libkvmplat: trace.common.o
@@ -171,9 +171,9 @@ To instantiate, use: kraft run
 [...]
 Starting VM...
 [...]
-                   Tethys 0.5.0~b8be82b
+                   Phoebe 0.10.0~3a997c1
 Hello world!
-Arguments:  "/home/razvan/hello/build/hello_kvm-x86_64" "console=ttyS0"
+Arguments:  "/home/X/hello/build/hello_kvm-x86_64" "console=ttyS0"
 ```
 
 In the snippet above, we selected parts of the output showing what `kraft` does behind the scenes:
@@ -196,9 +196,9 @@ Once this is done, we can now run the resulting unikernel image any time we want
 $ cd hello/
 $ kraft run
 [...]
-                   Tethys 0.5.0~b8be82b
+                   Phoebe 0.10.0~3a997c1
 Hello world!
-Arguments:  "/home/razvan/hello/build/hello_kvm-x86_64" "console=ttyS0"
+Arguments:  "/home/X/hello/build/hello_kvm-x86_64" "console=ttyS0"
 ```
 
 #### Doing it Step-by-Step Using kraft
@@ -230,8 +230,8 @@ $ ls
 CODING_STYLE.md  Config.uk  CONTRIBUTING.md  COPYING.md  kraft.yaml  main.c  MAINTAINERS.md  Makefile  Makefile.uk  monkey.h  README.md
 ```
 
-The `kraft.yaml` file is the most important file.
-It stores kraft-speficic configuration for the app and it's used by kraft when configuring, building and running the application.
+The `kraft.yaml` file is the most important file when building an app using kraft.
+It stores kraft-speficic configuration for the app and its dependencies on other libraries. It's used by kraft when configuring, building and running the application.
 Other files are important as well, but they are used behind the scenes by kraft.
 We will detail them later in the session and in session 02: Behind the Scenes.
 
@@ -241,9 +241,9 @@ A unikernel image may be targeted for multiple platforms and architectures.
 The available platforms and applications are listed in the `kraft.yaml` file:
 ```
 $ cat kraft.yaml
-specification: '0.4'
+specification: '0.5'
 
-unikraft: '0.5'
+unikraft: '0.10.0'
 
 architectures:
   x86_64: true
@@ -304,7 +304,7 @@ To run an already-built unikernel image, we use `kraft run`:
 $ kraft run
 [...]
 
-                   Tethys 0.5.0~b8be82b
+                   Phoebe 0.10.0~3a997c1
 Hello world!
 [...]
 ```
@@ -331,7 +331,7 @@ You can now alter between running the `linuxu` and the `kvm` built images by usi
 Of course, this is the most basic way you can use `kraft`, but there are many other options.
 To see every option `kraft` has to offer, you can simply type `kraft -h`.
 If you want to know about a certain command, just follow it with the `-h` option.
-For example, if I wanted to know more about the configure command, I would type `kraft configure -h`.
+For example, if one wants to know more about the configure command, they would type `kraft configure -h`.
 
 #### Manually Building the helloworld Application
 
@@ -339,7 +339,8 @@ Let's now learn how to build the app manually, without `kraft`.
 We won't go into too much detail, this will be handled more thoroughly in session 02: Behind the Scenes.
 
 The manual approach is more complicated (albeit giving you potentially more control) than kraft.
-For most of the use cases (development, testing, evaluating, using) of Unikraft, we recommend you use kraft.
+For most of the use cases (development, testing, evaluating, using) of Unikraft, we recommend you to use kraft.
+However, when you want to have more precise control over the configuration, building and running an unikernel, the manual approach can be very useful.
 
 We will go through the same steps as above:
 
@@ -395,6 +396,15 @@ So, in order to properly inform the build system of our current location, we wil
 ```
 $ UK_WORKDIR=~/.unikraft UK_ROOT=~/.unikraft/unikraft UK_LIBS=~/.unikraft/libs make menuconfig
 ```
+You can also export these environment variables for the current shell session:
+```
+$ export UK_WORKDIR=~/.unikraft UK_ROOT=~/.unikraft/unikraft UK_LIBS=~/.unikraft/libs
+```
+Then simply run:
+```
+$ make menuconfig
+```
+
 **Note**: This menu is also available through the `kraft menuconfig` command, which rids you of the hassle of manually setting the environment variables.
 
 We are met with the following configuration menu. Let's pick the architecture:
@@ -418,7 +428,7 @@ We will choose both `linuxu` and `kvm`:
 
 ##### Build
 
-Now let's build the final image (recall the environment variables):
+Now let's build the final image (recall the environment variables - make sure that they are correctly set):
 ```
 $ UK_WORKDIR=~/.unikraft UK_ROOT=~/.unikraft/unikraft UK_LIBS=~/.unikraft/libs  make
 [...]
@@ -434,7 +444,7 @@ Our final binaries are located inside the `build/` directory.
 
 ##### Run
 
-Let's run the `linuxu` image by doing a Linux-like executable running:
+Let's run the `linuxu` image by doing a Linux-like executable running. `linuxu` stands for Linux userspace; a `linuxu` image is just an executable that will be launched as a process in the host system:
 ```
 $ ./build/01-hello-world-manual_linuxu-x86_64  # The linuxu image
 Powered by
@@ -443,7 +453,7 @@ Oo   Oo  ___ (_) | __ __  __ _ ' _) :_
 oO   oO ' _ `| | |/ /  _)' _` | |_|  _)
 oOo oOO| | | | |   (| | | (_) |  _) :_
  OoOoO ._, ._:_:_,\_._,  .__,_:_, \___)
-                   Tethys 0.5.0~b8be82b
+                   Phoebe 0.10.0~3a997c1
 Hello world!
 ```
 
@@ -456,7 +466,7 @@ Oo   Oo  ___ (_) | __ __  __ _ ' _) :_
 oO   oO ' _ `| | |/ /  _)' _` | |_|  _)
 oOo oOO| | | | |   (| | | (_) |  _) :_
  OoOoO ._, ._:_:_,\_._,  .__,_:_, \___)
-                   Tethys 0.5.0~b8be82b
+                   Phoebe 0.10.0~3a997c1
 Hello world!
 Arguments:  "build/hello_kvm-x86_64"
 ```
@@ -509,7 +519,7 @@ Oo   Oo  ___ (_) | __ __  __ _ ' _) :_
 oO   oO ' _ `| | |/ /  _)' _` | |_|  _)
 oOo oOO| | | | |   (| | | (_) |  _) :_
  OoOoO ._, ._:_:_,\_._,  .__,_:_, \___)
-                   Tethys 0.5.0~b8be82b
+                   Tethys Phoebe 0.10.0~3a997c1
 Listening on port 8123...
 ```
 Use `Ctrl+c` to stop the HTTP server running as a unikernel virtual machine.
@@ -553,7 +563,7 @@ Oo   Oo  ___ (_) | __ __  __ _ ' _) :_
 oO   oO ' _ `| | |/ /  _)' _` | |_|  _)
 oOo oOO| | | | |   (| | | (_) |  _) :_
  OoOoO ._, ._:_:_,\_._,  .__,_:_, \___)
-                   Tethys 0.5.0~b8be82b
+                   Phoebe 0.10.0~3a997c1
 Listening on port 8123...
 ```
 The boot message confirms the assigning of the `172.44.0.2/24` IP address to the virtual machine.
@@ -628,7 +638,7 @@ fatal: destination path '~/.unikraft/libs/lwip' already exists and is not an emp
 ```
 The library is already cloned. That is because `kraft` took care of it for us behind the scenes in our previous automatic build.
 
-The next step is to add this library in the `Makefile`:
+The next step is to add this library in the `Makefile`. The `httpreply` app is missing the `Makefile` file, so you need to create one:
 ```
 UK_ROOT ?= $(HOME)/.unikraft/unikraft
 UK_LIBS ?= $(HOME)/.unikraft/libs
@@ -652,37 +662,15 @@ Now, we configure it through `make menuconfig`.
 If you noticed, the menu also automatically selected some other internal components that would be required by `lwip`.
 Now `Save` and `Exit` the configuration and run `make`.
 
+Make sure to also select the `KVM Guest` target in the `Platform Configuration` menu.
+
 ##### Build
 
 ```
 $ make
 ```
 
-##### Run
-
-To run the KVM image, we use the `qemu-system-x86_64` command:
-```
-$ qemu-system-x86_64 -kernel build/02-httpreply-manual_kvm-x86_64 -nographic
-[...]
-Powered by
-o.   .o       _ _               __ _
-Oo   Oo  ___ (_) | __ __  __ _ ' _) :_
-oO   oO ' _ `| | |/ /  _)' _` | |_|  _)
-oOo oOO| | | | |   (| | | (_) |  _) :_
- OoOoO ._, ._:_:_,\_._,  .__,_:_, \___)
-                   Tethys 0.5.0~b8be82b
-Listening on port 8123...
-```
-To close the running QEMU process, use the `Ctrl+a x` key combination.
-
-**Note**: We didn't go into configuring a functional network connection and actually querying the HTTP server.
-This is a bit more complicated and is outside the scope of this session.
-
-```
-sudo qemu-system-x86_64 -netdev bridge,id=en0,br=virbr0 -device virtio-net-pci,netdev=en0 -append "netdev.ipv4_addr=172.44.0.2 netdev.ipv4_gw_addr=172.44.0.1 netdev.ipv4_subnet_mask=255.255.255.0 --" -kernel build/02-httpreply-manual_kvm-x86_64 -nographic
-```
-
-##### Connecting to the HTTP Server
+##### Running and connecting to the HTTP server
 
 Similarly to kraft, in order to connect to the HTTP server, we use a virtual bridge to create a connection between the VM and the host system.
 We assign address `172.44.0.1/24` to the bridge interface (pointing to the host) and we assign address `172.44.0.2/24` to the virtual machine, by passing boot arguments.
@@ -706,7 +694,7 @@ Oo   Oo  ___ (_) | __ __  __ _ ' _) :_
 oO   oO ' _ `| | |/ /  _)' _` | |_|  _)
 oOo oOO| | | | |   (| | | (_) |  _) :_
  OoOoO ._, ._:_:_,\_._,  .__,_:_, \___)
-                   Tethys 0.5.0~b8be82b
+                   Phoebe 0.10.0~3a997c1
 Listening on port 8123...
 [...]
 ```
@@ -751,6 +739,8 @@ Things to consider:
 * You will need the Lightweight TCP/IP stack library (lwip): https://github.com/unikraft/lib-lwip
 * You will have to update the build and support files in the `work/01-echo-back/` directory.
 * If you want to run the application without `kraft`, the KVM launch script and network setup are already included inside `work/01-echo-back/launch.sh`.
+* If working with `kraft`, you must modify the `kraft.yaml` configuration file to include this app's dependency on the `lwip` library (just as `httpreply` depends on `lwip` as well).
+* Same goes with the manual approach: you must modify the `Makefile` to include the `lwip` library dependency.
 
 To test if your application works you can try sending it messages like so:
 ```
@@ -774,16 +764,15 @@ In this tutorial, we will see what we would need to do if we wanted to have a fi
 To make it easy, we will use the `9pfs` filesystem, as well as the `newlib` library.
 The latter is used so that we have available an API that would enable us to interact with this filesystem (functions such as `lseek`, `open`).
 
-**Note**: the build will fail if `unikraft` and `newlib` repositories aren't both on the `staging` or the `stable` branches.
-To avoid this situation, go to `~/.unikraft/unikraft` and checkout branch `staging`:
-```
-cd ~/.unikraft/unikraft
-git checkout staging
-```
 
-We will need to download `newlib`:
+We will need to download `newlib`. You can clone it directly:
 ```
 git clone https://github.com/unikraft/lib-newlib.git ~/.unikraft/libs/newlib
+```
+
+Or fetch it using `kraft`:
+```
+kraft list pull newlib
 ```
 
 Next, we include it in our `Makefile`:
@@ -813,10 +802,10 @@ For now, just make sure it successfully builds. If it does, move on to the next 
 For the final work item, you will have to update the source code from the second task, so that it stores in a file the received string before sending the encoded one back to the client.
 In order to achieve this, you must have the previous work item completed.
 
-The available resources are the exact same, you will simply have to modify `main.c`.
+The available resources are the exact same, you will simply have to modify `main.c`. Make sure to select `newlib` and `lwip` in `menuconfig` before building the application.
 
 To test if your application ran successfully, check to see whether the original strings you sent through the client are present in that file or not.
 
 ## Further Reading
 
-[Unikraft Documentation](http://docs.unikraft.org/index.html)
+[Unikraft Documentation](https://unikraft.org/docs/)

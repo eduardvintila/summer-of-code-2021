@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if test $# -ne 1; then
-    echo "Usage: $0 <kvm_image>" 1>&2
+    echo "Usage: $0 <path_to_kvm_image>" 1>&2
     exit 1
 fi
 
@@ -20,7 +20,7 @@ sudo qemu-system-x86_64  -fsdev local,id=myid,path=$(pwd)/fs0,security_model=non
                          -netdev bridge,id=en0,br=virbr0 \
                          -device virtio-net-pci,netdev=en0 \
                          -kernel "$kvm_image" \
-                         -append "netdev.ipv4_addr=172.44.0.2 netdev.ipv4_gw_addr=172.44.0.1 netdev.ipv4_subnet_mask=255.255.255.0 --" \
+                         -append "netdev.ipv4_addr=$vm_ip netdev.ipv4_gw_addr=$bridge_ip netdev.ipv4_subnet_mask=255.255.255.0 --" \
                          -cpu host \
                          -enable-kvm \
                          -nographic

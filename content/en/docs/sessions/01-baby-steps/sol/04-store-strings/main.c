@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
     int listenfd = -1;
     struct sockaddr_in serv_addr;
 
-    int filefd = open("my_strings", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int filefd = open("my_strings.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (filefd < 0) {
         fprintf(stderr, "socket");
         return 1;
